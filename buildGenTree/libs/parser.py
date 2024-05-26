@@ -29,6 +29,12 @@ def get_parser() -> argparse.ArgumentParser:
     # Options group.
     opts = parser.add_argument_group('Common options')
     opts.add_argument(
+        '--tsv-out-file',
+        help = 'Name of the output tsv file.',
+        type = str,
+        dest = 'out_file',
+    )
+    opts.add_argument(
         "-s",
         "--stream-output",
         dest="stream_output",

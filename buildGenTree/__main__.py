@@ -26,13 +26,14 @@ FASTA_DIR = CURR_DIR + '/buildGenTree/fastaSrc'
 MLST_DIR = CURR_DIR + '/buildGenTree/mlst/bin'
 MLST_JSON_FILE = CURR_DIR + '/buildGenTree/fastaSrc/tmpST.json'
 SRC_DB_FILE = None
+OUT_TSV_FILE = None
 
 def install_prerequisites() -> None:
     # TODO: Implement function
     LOG.info("Not implemented.")
 
 def setup_enviroment() -> None:
-    global SRC_DB_FILE
+    global SRC_DB_FILE, OUT_TSV_FILE
     CURR_DIR = os.getcwd()
     os.makedirs(FASTA_DIR, exist_ok=True)
     LOG.info("- Created fastaSrc folder.")
@@ -51,7 +52,13 @@ def setup_enviroment() -> None:
         raise FileNotFoundError(f"The source file not found")
     else:
         SRC_DB_FILE = tvs_file
-        LOG.info(f"- Source file was found.\n")
+        LOG.info("- Source file was found.")
+    
+    if ARGS.out_file and ARGS.out_file[-4:] == '.tsv':
+        OUT_TSV_FILE = ARGS.out_file
+    else:
+        OUT_TSV_FILE = 'filtered_genomes.tsv'
+    LOG.warning(f'- Output file will save on {OUT_TSV_FILE}\n')
 
 def get_credentials() -> dict:
     cur_dict: dict = {}
@@ -166,9 +173,8 @@ def filter_data_by_st() -> None:
             pass
     
     # Save csv_df on TSV file
-    output_tsv_file = 'filtered_genomes.tsv'
-    tsv_out_df.to_csv(output_tsv_file, sep='\t', index=False)
-    LOG.info(f"Filtered data saved to {output_tsv_file}")
+    tsv_out_df.to_csv(OUT_TSV_FILE, sep='\t', index=False)
+    LOG.info(f"Filtered data saved to {OUT_TSV_FILE}")
 
 def main():
     # check platform
