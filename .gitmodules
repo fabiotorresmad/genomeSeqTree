@@ -1,0 +1,3 @@
+[submodule "buildGenTree/mlst"]
+	path = buildGenTree/mlst
+	url = https://github.com/tseemann/mlst.git
