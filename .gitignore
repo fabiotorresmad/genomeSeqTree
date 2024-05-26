@@ -1,0 +1,6 @@
+.DS_Store
+buildGenTree/__pycache__/**
+buildGenTree/libs/__pycache__/**
+buildGenTree/fastaSrc
+logs/build_gen_tree.log
+*.tsv
