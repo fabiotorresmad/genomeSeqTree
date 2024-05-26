@@ -85,10 +85,13 @@ def preprocess_data(organism_grp: str) -> pd.DataFrame:
 def download_fna(assembly_accession, ncbi_access, output_file) -> None:
     url = ( f"{ncbi_access['api_uri']}/{assembly_accession}"
             f"/download?include_annotation_type=GENOME_FASTA")
-    response = requests.get(
-        url=url,
-        headers={'api-key': ncbi_access['api_key']},
-        stream=True)
+    if ncbi_access['api_key']:
+        response = requests.get(
+            url=url,
+            headers={'api-key': ncbi_access['api_key']},
+            stream=True)
+    else:
+        response = requests.get(url=url,stream=True)
     response.raise_for_status()     # Verificar que la solicitud fue exitosa
 
     with zipfile.ZipFile(io.BytesIO(response.content)) as zip_ref:
@@ -130,7 +133,6 @@ def filter_data_by_st() -> None:
 
     credentials_dict = get_credentials()
     st_value: int = credentials_dict["st_filter"]
-    
     
     LOG.info("2. Pre process file source")
     gca_df: pd.DataFrame = preprocess_data(credentials_dict["genome"])
