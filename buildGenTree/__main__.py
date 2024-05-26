@@ -85,9 +85,10 @@ def preprocess_data(organism_grp: str) -> pd.DataFrame:
         data_df['Assembly'].str.upper().str.startswith('GCA_', na=False) &
         data_df['#Organism group'].str.lower().str.startswith(organism_grp.lower(), na=False)
     ]
+    data_sort_df = filter_data_df.sort_values(by='Assembly')
     # Reiniciar el índice
-    filter_data_df.reset_index(drop=True, inplace=True)
-    return filter_data_df
+    data_sort_df.reset_index(drop=True, inplace=True)
+    return data_sort_df
 
 def download_fna(assembly_accession, ncbi_access, output_file) -> None:
     url = ( f"{ncbi_access['api_uri']}/{assembly_accession}"
