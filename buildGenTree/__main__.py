@@ -12,6 +12,8 @@ import zipfile
 import time
 import gc
 import pandas as pd
+import subprocess
+import pkg_resources
 
 from buildGenTree.libs.logger import setup_logger
 from buildGenTree.libs.parser import get_parser
@@ -22,15 +24,64 @@ LOG = logging.getLogger(__name__)
 os.makedirs(os.getcwd() + '/logs', exist_ok=True)
 
 CURR_DIR = os.getcwd()
+PIP_PACKETS_FILE = CURR_DIR + '/requirements.txt'
 FASTA_DIR = CURR_DIR + '/buildGenTree/fastaSrc'
 MLST_DIR = CURR_DIR + '/buildGenTree/mlst/bin'
 MLST_JSON_FILE = CURR_DIR + '/buildGenTree/fastaSrc/tmpST.json'
 SRC_DB_FILE = None
 OUT_TSV_FILE = None
 
-def install_prerequisites() -> None:
-    # TODO: Implement function
-    LOG.info("Not implemented.")
+def read_requirements() -> list[str]:
+    with open(PIP_PACKETS_FILE, 'r') as file:
+        requirements = file.readlines()
+    requirements = [req.strip() for req in requirements if req.strip() and not req.startswith('#')]
+    return requirements
+
+def check_pip_packets() -> bool:
+    required_packages = read_requirements()
+    
+    # Get packet list
+    installed_packages = {pkg.key for pkg in pkg_resources.working_set}
+    
+    # Check if packets are installed
+    missing_packages = [pkg for pkg in required_packages if pkg.split('==')[0] not in installed_packages]
+    return missing_packages == []
+
+def install_missing_packets():
+    LOG.info("- Installing missing Python packets.")
+    subprocess.check_call([f'python3', '-m', 'pip', 'install', '-r', 'requirements.txt'])
+
+def get_submodule_paths() -> list:
+    submodule_paths = []
+    if os.path.exists('.gitmodules'):
+        with open('.gitmodules') as f:
+            lines = f.readlines()
+            for line in lines:
+                if 'path' in line:
+                    path = line.split('=')[1].strip()
+                    submodule_paths.append(path)
+    return submodule_paths
+
+def is_git_repository(path: str) -> bool:
+    try:
+        subprocess.check_output(['git', '-C', path, 'rev-parse', '--is-inside-work-tree'],
+                                stderr=subprocess.STDOUT)
+        return True
+    except subprocess.CalledProcessError:
+        return False
+
+def check_submodules() -> bool:
+    submodule_paths = get_submodule_paths()
+    all_cloned = True
+    for path in submodule_paths:
+        if not os.path.isdir(path) or not is_git_repository(path):
+            all_cloned = False
+            LOG.warning(f"- Submodule {path} is not cloned properly.")
+    return all_cloned
+
+def install_missing_submodules():
+    LOG.info("- Installing missing submodules.")
+    subprocess.check_call(['git', 'submodule', 'update', '--init', '--recursive'])
 
 def setup_enviroment() -> None:
     global SRC_DB_FILE, OUT_TSV_FILE
@@ -183,11 +234,15 @@ def main():
         LOG.error("This program is not yet available on Windows OS.")
         sys.exit(0)
     
-    # install prerequisites
-    if (ARGS.install):
-        LOG.info("Install prerequisites!")
-        install_prerequisites()
-        sys.exit(0)
+    # Check prerequisites
+    LOG.info("Check prerequisites.")
+    if not check_submodules():
+        install_missing_submodules()
+    LOG.info("- All submodules are cloned properly.")
+
+    if not check_pip_packets():
+        install_missing_packets()
+    LOG.info("- All packets was installed!\n")
 
     filter_data_by_st()
 

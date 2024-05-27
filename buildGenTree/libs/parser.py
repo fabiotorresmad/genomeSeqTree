@@ -42,12 +42,6 @@ def get_parser() -> argparse.ArgumentParser:
         action="store_true",
     )
     opts.add_argument(
-        '-i', '--install',
-        help = 'Task to be performed.',
-        action="store_true",
-        dest='install',
-    )
-    opts.add_argument(
         '--log-level',
         dest='log_level',
         default=logging.INFO,
