@@ -26,7 +26,7 @@ os.makedirs(os.getcwd() + '/logs', exist_ok=True)
 CURR_DIR = os.getcwd()
 PIP_PACKETS_FILE = CURR_DIR + '/requirements.txt'
 FASTA_DIR = CURR_DIR + '/buildGenTree/fastaSrc'
-MLST_DIR = CURR_DIR + '/buildGenTree/mlst/bin'
+MLST_DIR = CURR_DIR + '/source/mlst/bin'
 MLST_JSON_FILE = CURR_DIR + '/buildGenTree/fastaSrc/tmpST.json'
 SRC_DB_FILE = None
 OUT_TSV_FILE = None
@@ -130,7 +130,18 @@ def get_credentials() -> dict:
 
 def preprocess_data(organism_grp: str) -> pd.DataFrame:
     LOG.debug(f"Load dataframe for {SRC_DB_FILE} file")
+
+    LOG.warning("- Try to load tsv file with '\\t' delimiter.")
     data_df = pd.read_table(SRC_DB_FILE, delimiter='\t', low_memory=False)
+    if 'Assembly' not in data_df.columns:
+        del data_df
+        LOG.warning("- Try to load tsv file with ',' delimiter.")
+        data_df = pd.read_table(SRC_DB_FILE, delimiter=',', low_memory=False)
+    
+    if 'Assembly' not in data_df.columns:
+        LOG.error("tsv file delimiteris different to '\\t' or ','")
+        return pd.DataFrame()
+    
     LOG.debug(data_df)
     filter_data_df = data_df.loc[
         data_df['Assembly'].str.upper().str.startswith('GCA_', na=False) &
@@ -195,9 +206,13 @@ def filter_data_by_st() -> None:
     
     LOG.info("2. Pre process file source")
     gca_df: pd.DataFrame = preprocess_data(credentials_dict["genome"])
-    tsv_out_df = pd.DataFrame(columns=gca_df.columns)
-    LOG.info(f"- Was found {len(gca_df)} assembly accessions.\n")
+    if gca_df.empty:
+        LOG.info(f"- Was found {len(gca_df)} assembly accessions.\n")
+        return
+    else:
+        tsv_out_df = pd.DataFrame(columns=gca_df.columns)
 
+    LOG.info(f"- Was found {len(gca_df)} assembly accessions.\n")
     LOG.info("3. Filter genomes by sequence type")
     for idx, assembly in enumerate(gca_df['Assembly']):
         fasta_file = f'{FASTA_DIR}/{assembly}.fna'
