@@ -180,7 +180,7 @@ def run_mlst(fasta_file: str) -> bool:
     except Exception as e:
         raise ChildProcessError(e)
 
-def check_mlst(st_val: int) -> int:
+def check_mlst(st_val: int) -> bool:
     try:
         mlst_data = open(MLST_JSON_FILE)
     except FileNotFoundError as e:
@@ -191,7 +191,7 @@ def check_mlst(st_val: int) -> int:
         mlst_val = mlst_json[0]['sequence_type']
 
         if '-' in mlst_val:
-            return -1
+            return False
         return int(mlst_val) == st_val
 
 def filter_data_by_st() -> None:
@@ -229,6 +229,9 @@ def filter_data_by_st() -> None:
                 if len(tsv_out_df) == 0 or assembly != tsv_out_df.iloc[-1]['Assembly']:
                     LOG.debug(f"- {assembly}: The sequence type is equal from that required.")
                     tsv_out_df = pd.concat([tsv_out_df, gca_df.loc[[idx]]], ignore_index=True)
+                    
+                    # Save csv_df on TSV file
+                    tsv_out_df.to_csv(OUT_TSV_FILE, sep='\t', index=False)
                 else:
                     LOG.warning(f"- {assembly}: Duplicated in output file.")
             else:
@@ -239,8 +242,6 @@ def filter_data_by_st() -> None:
             LOG.error(f'{e}')
             pass
     
-    # Save csv_df on TSV file
-    tsv_out_df.to_csv(OUT_TSV_FILE, sep='\t', index=False)
     LOG.info(f"Filtered data saved to {OUT_TSV_FILE}")
 
 def main():
