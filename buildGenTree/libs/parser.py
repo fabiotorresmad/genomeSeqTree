@@ -11,11 +11,6 @@ def get_parser() -> argparse.ArgumentParser:
     # Required group.
     cmd = parser.add_argument_group('Commands')
     cmd.add_argument(
-        'st',
-        help = 'Sequence type to be filter.',
-        type = int,
-    )
-    cmd.add_argument(
         dest="file_src",
         default=None,
         help="Set tsv source file path",
@@ -23,7 +18,16 @@ def get_parser() -> argparse.ArgumentParser:
     cmd.add_argument(
         'group',
         help = 'Organism group to be filter.',
+        type=str,
         nargs = '+',
+    )
+    cmd.add_argument(
+        '-st',
+        help = 'Sequence type to be filter.',
+        nargs = '+',
+        type = int,
+        default = 0,
+        dest='st',
     )
 
     # Options group.

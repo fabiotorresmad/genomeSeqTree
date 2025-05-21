@@ -14,7 +14,9 @@ import gc
 import pandas as pd
 import subprocess
 import pkg_resources
+import shutil
 
+from datetime import date
 from buildGenTree.libs.logger import setup_logger
 from buildGenTree.libs.parser import get_parser
 from buildGenTree.libs.bash import exec
@@ -24,12 +26,21 @@ LOG = logging.getLogger(__name__)
 os.makedirs(os.getcwd() + '/logs', exist_ok=True)
 
 CURR_DIR = os.getcwd()
-PIP_PACKETS_FILE = CURR_DIR + '/requirements.txt'
-FASTA_DIR = CURR_DIR + '/buildGenTree/fastaSrc'
-MLST_DIR = CURR_DIR + '/source/mlst/bin'
-MLST_JSON_FILE = CURR_DIR + '/buildGenTree/fastaSrc/tmpST.json'
+DATE_DIR = date.today().strftime("%Y%m%d")
+PIP_PACKETS_FILE = f"{CURR_DIR}/requirements.txt"
+FASTA_DIR = f"{CURR_DIR}/buildGenTree/{DATE_DIR}/fastaSrc"
+MLST_DIR = f"{CURR_DIR}/source/mlst/bin"
+MLST_JSON_FILE = f"{CURR_DIR}/buildGenTree/{DATE_DIR}/fastaSrc/tmpST.json"
 SRC_DB_FILE = None
 OUT_TSV_FILE = None
+
+def get_yes_no_input(prompt: str) -> bool:
+    while True:
+        user_input = input(f"{prompt} (yes/no): ").lower()
+        if user_input in ["yes", "no", "y", "n"]:
+            return user_input in ["yes", "y"]
+        else:
+            print("Invalid input. Please enter 'yes' or 'no'.")
 
 def read_requirements() -> list[str]:
     with open(PIP_PACKETS_FILE, 'r') as file:
@@ -87,6 +98,9 @@ def setup_enviroment() -> None:
     global SRC_DB_FILE, OUT_TSV_FILE
     CURR_DIR = os.getcwd()
     os.makedirs(FASTA_DIR, exist_ok=True)
+    if ARGS.st != 0:
+        for i in ARGS.st:
+            os.makedirs(f"{FASTA_DIR}St_{i}", exist_ok=True)
     LOG.info("- Created fastaSrc folder.")
 
     if not os.path.exists(f"{MLST_DIR}/mlst"):
@@ -198,11 +212,8 @@ def filter_data_by_st() -> None:
     LOG.info("1. Setup enviroment")
     setup_enviroment()
 
-    credentials_dict: dict = {}
-    assemblyIds: list = []
-
-    credentials_dict = get_credentials()
-    st_value: int = credentials_dict["st_filter"]
+    credentials_dict: dict = get_credentials()
+    st_values = credentials_dict["st_filter"]
     
     LOG.info("2. Pre process file source")
     gca_df: pd.DataFrame = preprocess_data(credentials_dict["genome"])
@@ -213,7 +224,12 @@ def filter_data_by_st() -> None:
         tsv_out_df = pd.DataFrame(columns=gca_df.columns)
 
     LOG.info(f"- Was found {len(gca_df)} assembly accessions.\n")
-    LOG.info("3. Filter genomes by sequence type")
+    
+    if type(st_values) is list:
+        LOG.info("3. Filter genomes by sequence type")
+    else:
+        LOG.info(f"3. Download fna files from {SRC_DB_FILE}")
+
     for idx, assembly in enumerate(gca_df['Assembly']):
         fasta_file = f'{FASTA_DIR}/{assembly}.fna'
 
@@ -224,20 +240,27 @@ def filter_data_by_st() -> None:
                     ncbi_access=credentials_dict,
                     output_file=fasta_file
                 )
+            
+            if type(st_values) is not list:
+                LOG.info(f"- {assembly}.fna file downloaded!")
+                continue
+
             run_mlst(fasta_file)
-            if check_mlst(st_value):
-                if len(tsv_out_df) == 0 or assembly != tsv_out_df.iloc[-1]['Assembly']:
-                    LOG.debug(f"- {assembly}: The sequence type is equal from that required.")
-                    tsv_out_df = pd.concat([tsv_out_df, gca_df.loc[[idx]]], ignore_index=True)
-                    
-                    # Save csv_df on TSV file
-                    tsv_out_df.to_csv(OUT_TSV_FILE, sep='\t', index=False)
-                else:
-                    LOG.warning(f"- {assembly}: Duplicated in output file.")
-            else:
-                if os.path.exists(fasta_file):
-                    os.remove(fasta_file)
-                LOG.warning(f"- {assembly}: fna file was deleted.")
+            for st_value in st_values:
+                if check_mlst(st_value):
+                    if len(tsv_out_df) == 0 or assembly != tsv_out_df.iloc[-1]['Assembly']:
+                        LOG.debug(f"- {assembly}: The sequence type is equal from that required.")
+                        tsv_out_df = pd.concat([tsv_out_df, gca_df.loc[[idx]]], ignore_index=True)
+                        
+                        # Save csv_df on TSV file
+                        tsv_out_df.to_csv(OUT_TSV_FILE, sep='\t', index=False)
+                    else:
+                        LOG.warning(f"- {assembly}: Duplicated in output file.")
+                    shutil.move(fasta_file, f"{FASTA_DIR}St_{st_value}/")
+
+            if os.path.exists(fasta_file):
+                os.remove(fasta_file)
+            LOG.warning(f"- {assembly}: fna file was deleted.")
         except Exception as e:
             LOG.error(f'{e}')
             pass
@@ -267,6 +290,15 @@ if __name__ == "__main__":
     parser = get_parser()
     ARGS = parser.parse_args()
     setup_logger("build_gen_tree", ARGS.log_level, ARGS.stream_output)
+
+    # Check st filter
+    if (ARGS.st == 0):
+        LOG.warning(f"All elements of {ARGS.file_src} database will be downloaded")
+        if not get_yes_no_input("Do you want to continue?"):
+            LOG.info("-- Program finished --")
+            sys.exit(0)
+        else:
+            LOG.info("Condition accepted!")
 
     try:
         main()
